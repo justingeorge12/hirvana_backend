@@ -7,11 +7,13 @@ from rest_framework.response import Response
 from rest_framework import status
 from .models import Employee
 from .serializer import EmployeeSerializer
+from .pagination import Pagination
 
+
+#for create employee
 class CreateEmployee(APIView):
     def post(self, request):
         try:
-            # Validate required fields
             required_fields = ["name", "email", "age", "gender", "address"]
             for field in required_fields:
                 if field not in request.data:
@@ -19,7 +21,6 @@ class CreateEmployee(APIView):
 
             # Check if employee already exists with the same email
             if Employee.objects.filter(email=request.data["email"]).exists():
-                print('comes in the view and checkk--------------------------------------------------------------')
                 return Response({"message": "employee already exists", "success": False}, status=409)
 
             # Save employee
@@ -34,6 +35,7 @@ class CreateEmployee(APIView):
             return Response({"message": "employee creation failed", "success": False}, status=500)
 
 
+# getting the employees, and pagination aslo working
 class GetEmployee(APIView):
     def get(self, request):
         try:
@@ -45,20 +47,23 @@ class GetEmployee(APIView):
                 serializer = EmployeeSerializer(employee)
                 return Response({"message": "employee details found", "success": True, "employees": [serializer.data]}, status=200)
             
-            employees = Employee.objects.all()
-            serializer = EmployeeSerializer(employees, many=True)
-            return Response({"message": "employee details found", "success": True, "employees": serializer.data}, status=200)
+            # pagination
+            employees = Employee.objects.all().order_by('-id')
+            paginator = Pagination()
+            paginated_employees = paginator.paginate_queryset(employees, request)
+            serializer = EmployeeSerializer(paginated_employees, many=True)
+            
+            return paginator.get_paginated_response({"message": "employee details found", "success": True, "employees": serializer.data})
 
         except Exception as e:
             return Response({"message": "employee details not found", "success": False, "employees": []}, status=500)
 
 
-
+# update the employee
 class UpdateEmployee(APIView):
     def put(self, request):
         try:
             regid = request.data.get("regid")
-            print(regid, '------------------------==============================================')
             if not regid:
                 return Response({"message": "invalid body request", "success": False}, status=400)
 
@@ -66,7 +71,6 @@ class UpdateEmployee(APIView):
             if not employee:
                 return Response({"message": "no employee found with this regid", "success": False}, status=200)
 
-            print(request.data, '=======================================================================================')
             serializer = EmployeeSerializer(employee, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
@@ -78,13 +82,11 @@ class UpdateEmployee(APIView):
             return Response({"message": "employee updation failed", "success": False}, status=500)
 
 
-
+# delete the employeee
 class DeleteEmployee(APIView):
     def delete(self, request):
         try:
-            print('hey-----------------------------------------------------')
             regid = request.data.get("regid")
-            print(regid, '----------------------------------------')
             if not regid:
                 return Response({"message": "invalid body request", "success": False}, status=400)
 
